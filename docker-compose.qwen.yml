@@ -1,0 +1,136 @@
+version: '3.8'
+
+services:
+  # Qwen3-Next-80B Model Server
+  qwen3-next:
+    build:
+      context: .
+      dockerfile: Dockerfile.rtx5090
+    image: qwen3-rtx5090:latest
+    container_name: qwen3-next-vllm
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "0.0.0.0:8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/models
+      - ./models:/models
+      - /tmp:/tmp  # For CPU offloading
+    env_file:
+      - .env
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
+      - HF_TOKEN=${HF_TOKEN}
+      - VLLM_LOGGING_LEVEL=INFO
+      - HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-0}
+      # RTX 5090 Blackwell settings
+      - TORCH_CUDA_ARCH_LIST=7.0;7.5;8.0;8.6;8.9;9.0;12.0+PTX
+      - VLLM_USE_TRITON_FLASH_ATTN=1
+      - VLLM_ATTENTION_BACKEND=FLASH_ATTN
+      - CUDA_GRAPH_DISABLE=1
+      - VLLM_DISABLE_CUSTOM_ALL_REDUCE=1
+    command: >
+      python -m vllm.entrypoints.openai.api_server
+      --model Qwen/Qwen3-30B-A3B
+      --dtype auto
+      --gpu-memory-utilization 0.90
+      --cpu-offload-gb 40
+      --max-model-len 8192
+      --tensor-parallel-size 1
+      --host 0.0.0.0
+      --port 8000
+      --trust-remote-code
+      --enforce-eager
+      --disable-custom-all-reduce
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 300s
+    restart: unless-stopped
+    shm_size: '32gb'
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  # Backend API (reuse existing)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: gpt-oss-backend:latest
+    container_name: qwen-backend
+    ports:
+      - "0.0.0.0:8080:8080"
+      - "0.0.0.0:8001:8001"
+    environment:
+      - ENV=production
+      - HOST=0.0.0.0
+      - PORT=8080
+      - LOG_LEVEL=INFO
+      - VLLM_BASE_URL=http://qwen3-next:8000
+      - VLLM_MODEL=Qwen/Qwen3-30B-A3B
+      - VLLM_MAX_TOKENS=16384
+      - VLLM_TEMPERATURE=0.7
+      - VLLM_TOP_P=0.8
+      - VLLM_TIMEOUT=120
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    depends_on:
+      - qwen3-next
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Streamlit Frontend (reuse existing)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: gpt-oss-frontend:latest
+    container_name: qwen-frontend
+    ports:
+      - "0.0.0.0:8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8080
+      - TOOL_PROXY_URL=http://backend:8001
+      - PROXY_URL=http://backend:8001/v1/chat/completions
+      - PROXY_BASE=http://backend:8001
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_SERVER_FILE_WATCHER_TYPE=none
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    command: streamlit run frontend_integrated.py
+
+networks:
+  default:
+    name: qwen-network
+    driver: bridge

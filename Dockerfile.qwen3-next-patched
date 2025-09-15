@@ -1,0 +1,59 @@
+# Qwen3-Next-80B-A3B-Instruct with vLLM patch
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+# Install Python and system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.10 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+RUN update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
+
+# Upgrade pip
+RUN pip install --upgrade pip
+
+# Install PyTorch with CUDA 12.4 support (more compatible with newer GPUs)
+RUN pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+
+# Install vLLM and dependencies
+RUN pip install vllm==0.6.6.post1 \
+    transformers \
+    accelerate \
+    bitsandbytes \
+    sentencepiece \
+    protobuf
+
+# Copy the startup script with Qwen3Next support
+COPY vllm_qwen3_startup.py /app/vllm_qwen3_startup.py
+
+# Patch vLLM to register Qwen3Next model
+RUN python -c "from vllm.model_executor.models import qwen2; import vllm.model_executor.models.registry as r; r._MODELS = getattr(r, '_MODELS', {}); r._MODELS['Qwen3NextForCausalLM'] = qwen2.Qwen2ForCausalLM" || true
+
+# Environment variables for RTX 5090 workaround
+ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+ENV CUDA_VISIBLE_DEVICES=0
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+# Model cache directory
+ENV HF_HOME=/models
+ENV TRANSFORMERS_CACHE=/models
+
+# Create necessary directories
+RUN mkdir -p /models /app
+
+# Working directory
+WORKDIR /app
+
+# Expose API port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Use the patched startup script
+ENTRYPOINT ["python", "/app/vllm_qwen3_startup.py"]
