@@ -1,0 +1,36 @@
+{
+  "timestamp": "20250916_181141",
+  "total_tokens": 10000,
+  "total_time": 98.12429407201125,
+  "overall_speed": 101.91156119463362,
+  "scenarios": [
+    {
+      "scenario": "Short burst (100 tokens)",
+      "tokens": 500,
+      "time": 4.876048984006047,
+      "avg_speed": 102.54206205547867,
+      "runs": 5
+    },
+    {
+      "scenario": "Medium generation (500 tokens)",
+      "tokens": 1500,
+      "time": 14.672057673014933,
+      "avg_speed": 102.23531263095998,
+      "runs": 3
+    },
+    {
+      "scenario": "Large generation (2000 tokens)",
+      "tokens": 4000,
+      "time": 39.1423566309968,
+      "avg_speed": 102.19111817984285,
+      "runs": 2
+    },
+    {
+      "scenario": "Maximum generation (4000 tokens)",
+      "tokens": 4000,
+      "time": 39.43383078399347,
+      "avg_speed": 101.43574490418604,
+      "runs": 1
+    }
+  ]
+}

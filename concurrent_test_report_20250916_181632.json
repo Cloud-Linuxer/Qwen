@@ -1,0 +1,69 @@
+{
+  "timestamp": "20250916_181632",
+  "scenarios": [
+    {
+      "concurrent": 1,
+      "tokens_per_request": 100,
+      "total_tokens": 100,
+      "overall_time": 0.9858611119998386,
+      "throughput": 101.43416631694502,
+      "success_rate": 1.0
+    },
+    {
+      "concurrent": 2,
+      "tokens_per_request": 100,
+      "total_tokens": 200,
+      "overall_time": 1.2024893680063542,
+      "throughput": 166.32163686535245,
+      "success_rate": 1.0
+    },
+    {
+      "concurrent": 5,
+      "tokens_per_request": 100,
+      "total_tokens": 500,
+      "overall_time": 1.0482058040070115,
+      "throughput": 477.0055633050621,
+      "success_rate": 1.0
+    },
+    {
+      "concurrent": 10,
+      "tokens_per_request": 100,
+      "total_tokens": 1000,
+      "overall_time": 1.2685132160113426,
+      "throughput": 788.3244631414691,
+      "success_rate": 1.0
+    },
+    {
+      "concurrent": 20,
+      "tokens_per_request": 100,
+      "total_tokens": 2000,
+      "overall_time": 1.2481736940098926,
+      "throughput": 1602.3410921077693,
+      "success_rate": 1.0
+    },
+    {
+      "concurrent": 5,
+      "tokens_per_request": 500,
+      "total_tokens": 2500,
+      "overall_time": 5.1308204180095345,
+      "throughput": 487.2515107378982,
+      "success_rate": 1.0
+    },
+    {
+      "concurrent": 10,
+      "tokens_per_request": 500,
+      "total_tokens": 4966,
+      "overall_time": 10.25029885400727,
+      "throughput": 484.47367932678213,
+      "success_rate": 1.0
+    },
+    {
+      "concurrent": 5,
+      "tokens_per_request": 1000,
+      "total_tokens": 4374,
+      "overall_time": 10.237692763010273,
+      "throughput": 427.2447026153847,
+      "success_rate": 1.0
+    }
+  ]
+}
