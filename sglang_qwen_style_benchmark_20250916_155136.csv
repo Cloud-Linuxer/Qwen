@@ -1,0 +1,31 @@
+구성,테스트 유형,측정 항목,값,단위,세부사항
+Balanced-v2-LOF,토큰 생성 성능,10 토큰 생성 지연시간,0.97,seconds,10 토큰 실제 생성
+Balanced-v2-LOF,토큰 생성 성능,10 토큰 생성 속도,10.29,tokens/sec,
+Balanced-v2-LOF,토큰 생성 성능,50 토큰 생성 지연시간,4.87,seconds,50 토큰 실제 생성
+Balanced-v2-LOF,토큰 생성 성능,50 토큰 생성 속도,10.27,tokens/sec,
+Balanced-v2-LOF,토큰 생성 성능,100 토큰 생성 지연시간,9.73,seconds,100 토큰 실제 생성
+Balanced-v2-LOF,토큰 생성 성능,100 토큰 생성 속도,10.28,tokens/sec,
+Balanced-v2-LOF,토큰 생성 성능,200 토큰 생성 지연시간,19.47,seconds,200 토큰 실제 생성
+Balanced-v2-LOF,토큰 생성 성능,200 토큰 생성 속도,10.27,tokens/sec,
+Balanced-v2-LOF,토큰 생성 성능,500 토큰 생성 지연시간,48.7,seconds,500 토큰 실제 생성
+Balanced-v2-LOF,토큰 생성 성능,500 토큰 생성 속도,10.27,tokens/sec,
+Balanced-v2-LOF,프롬프트 길이 영향,프롬프트 3 토큰,9.73,seconds,
+Balanced-v2-LOF,프롬프트 길이 영향,프롬프트 5 토큰,9.73,seconds,
+Balanced-v2-LOF,프롬프트 길이 영향,프롬프트 5 토큰,9.73,seconds,
+Balanced-v2-LOF,프롬프트 길이 영향,프롬프트 7 토큰,9.73,seconds,
+Balanced-v2-LOF,온도 설정 영향,온도 0.0 지연시간,9.72,seconds,
+Balanced-v2-LOF,온도 설정 영향,온도 0.3 지연시간,9.74,seconds,
+Balanced-v2-LOF,온도 설정 영향,온도 0.5 지연시간,9.74,seconds,
+Balanced-v2-LOF,온도 설정 영향,온도 0.7 지연시간,9.74,seconds,
+Balanced-v2-LOF,온도 설정 영향,온도 0.9 지연시간,9.74,seconds,
+Balanced-v2-LOF,온도 설정 영향,온도 1.0 지연시간,9.74,seconds,
+Balanced-v2-LOF,동시 사용자 처리,1명 처리량,0.21,req/sec,1명 동시
+Balanced-v2-LOF,동시 사용자 처리,1명 평균 지연시간,4.87,seconds,1명 동시
+Balanced-v2-LOF,동시 사용자 처리,2명 처리량,0.42,req/sec,2명 동시
+Balanced-v2-LOF,동시 사용자 처리,2명 평균 지연시간,4.71,seconds,2명 동시
+Balanced-v2-LOF,동시 사용자 처리,5명 처리량,1.06,req/sec,5명 동시
+Balanced-v2-LOF,동시 사용자 처리,5명 평균 지연시간,4.72,seconds,5명 동시
+Balanced-v2-LOF,동시 사용자 처리,10명 처리량,2.1,req/sec,10명 동시
+Balanced-v2-LOF,동시 사용자 처리,10명 평균 지연시간,4.76,seconds,10명 동시
+Balanced-v2-LOF,동시 사용자 처리,20명 처리량,4.21,req/sec,20명 동시
+Balanced-v2-LOF,동시 사용자 처리,20명 평균 지연시간,4.75,seconds,20명 동시
