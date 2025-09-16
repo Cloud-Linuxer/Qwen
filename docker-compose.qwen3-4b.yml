@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # Qwen3-4B-Instruct Model Server - RTX 5090 Compatible
+  qwen3-4b:
+    image: vllm/vllm-openai:latest
+    container_name: qwen3-4b-vllm
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "0.0.0.0:8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      - ./models:/models
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+      - HF_TOKEN=${HF_TOKEN:-}
+      - VLLM_LOGGING_LEVEL=INFO
+      - HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-0}
+      # RTX 5090 (sm_120) compatibility settings
+      - TORCH_CUDA_ARCH_LIST=8.0;8.6;8.9;9.0
+      - VLLM_ATTENTION_BACKEND=XFORMERS
+      - VLLM_DISABLE_CUSTOM_ALL_REDUCE=1
+      - VLLM_USE_FLASHINFER_SAMPLER=0
+      - VLLM_USE_V1=0  # Use V0 engine for better compatibility
+      - DISABLE_CUSTOM_ALL_REDUCE=1
+    command: >
+      --model Qwen/Qwen3-4B-Instruct-2507
+      --dtype float16
+      --gpu-memory-utilization 0.85
+      --max-model-len 4096
+      --tensor-parallel-size 1
+      --host 0.0.0.0
+      --port 8000
+      --trust-remote-code
+      --download-dir /root/.cache/huggingface
+      --enforce-eager
+      --disable-log-requests
+      --disable-log-stats
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    restart: unless-stopped
+    shm_size: '16gb'
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+
+networks:
+  default:
+    name: qwen3-4b-network
+    driver: bridge

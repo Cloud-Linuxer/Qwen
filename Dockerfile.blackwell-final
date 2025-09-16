@@ -1,0 +1,33 @@
+# CUDA 12.8 + cuDNN + dev 툴
+FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-dev git build-essential ca-certificates wget curl \
+    libnuma-dev libnuma1 && \
+    rm -rf /var/lib/apt/lists/*
+
+# PyTorch (CUDA 12.8 빌드) - nightly 사용
+RUN pip3 install --upgrade pip && \
+    pip3 install --pre torch torchvision torchaudio \
+      --index-url https://download.pytorch.org/whl/nightly/cu128
+
+# SGLang 본체
+RUN pip3 install "sglang[all]"
+
+# 🔒 sgl-kernel: 최신 CUDA 12.8 wheel 설치 (Blackwell 지원)
+RUN pip3 install --no-cache-dir \
+  https://github.com/sgl-project/whl/releases/download/v0.3.9.post2/sgl_kernel-0.3.9.post2%2Bcu128-cp310-abi3-manylinux2014_x86_64.whl
+
+# 환경변수 설정
+ENV CUDA_VISIBLE_DEVICES=0
+ENV PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
+
+WORKDIR /workspace
+EXPOSE 8000
+
+# 시작 스크립트
+ENTRYPOINT ["python3", "-m", "sglang.launch_server"]

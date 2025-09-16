@@ -1,0 +1,48 @@
+# RTX 5090 지원 - CUDA 12.4 + PyTorch 2.5.1
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/root/.cache/huggingface
+
+# 시스템 패키지 설치
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-pip python3-dev git build-essential \
+      wget curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# pip 업그레이드
+RUN pip3 install --upgrade pip
+
+# PyTorch 2.5.1 cu124 설치 (RTX 5090 지원)
+RUN pip3 install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 \
+      --index-url https://download.pytorch.org/whl/cu124
+
+# SGLang 설치
+RUN pip3 install "sglang[all]"
+
+# AWQ 지원 패키지
+RUN pip3 install \
+    auto-awq \
+    autoawq \
+    numpy \
+    sentencepiece \
+    tiktoken \
+    transformers \
+    accelerate
+
+# 환경 변수
+ENV NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0+PTX" \
+    CUDA_LAUNCH_BLOCKING=0
+
+WORKDIR /workspace
+
+EXPOSE 8000 8001
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+ENTRYPOINT ["python3", "-m", "sglang.launch_server"]

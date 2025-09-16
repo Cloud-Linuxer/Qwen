@@ -1,0 +1,126 @@
+# SGLang Source Build for RTX 5090 with PyTorch 2.7.0
+# Builds sgl_kernel from source to ensure symbol compatibility
+FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3-pip \
+    git \
+    wget \
+    curl \
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    libnuma-dev \
+    libnuma1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Upgrade pip and install build tools
+RUN python -m pip install --upgrade pip setuptools wheel ninja
+
+# Critical: Install PyTorch 2.7.0 with CUDA 12.8 FIRST
+# This establishes the ABI that sgl_kernel must be built against
+# Uninstall any existing torch first to ensure clean installation
+RUN pip uninstall -y torch torchvision torchaudio 2>/dev/null || true && \
+    pip install --no-cache-dir torch==2.7.0+cu128 --index-url https://download.pytorch.org/whl/cu128 --force-reinstall && \
+    pip install --no-cache-dir torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+
+# Install essential Python build dependencies
+RUN pip install --no-cache-dir \
+    packaging \
+    numpy \
+    pybind11 \
+    cmake \
+    ninja
+
+# Set CUDA architecture flags for RTX 5090 (Blackwell sm_120)
+ENV TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;12.0+PTX"
+ENV CUDA_ARCHITECTURES="80;86;89;90;120"
+ENV NVCC_PREPEND_FLAGS="-ccbin g++"
+
+# Ensure CUDA toolkit paths are available
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH="${CUDA_HOME}/bin:${PATH}"
+ENV LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}"
+
+# Force clean compilation
+ENV FORCE_CUDA=1
+ENV MAX_JOBS=8
+
+# Build directory
+WORKDIR /build
+
+# Clone SGLang source
+RUN git clone https://github.com/sgl-project/sglang.git && \
+    cd sglang && \
+    git submodule update --init --recursive
+
+# Install base Python dependencies first
+RUN cd sglang && \
+    pip install --no-cache-dir \
+    transformers \
+    accelerate \
+    requests \
+    pillow \
+    aiohttp \
+    openai \
+    anthropic \
+    fastapi \
+    uvicorn \
+    psutil \
+    numpy \
+    packaging
+
+# Build sgl_kernel from source
+# This is the critical step that ensures PyTorch 2.7.0 ABI compatibility
+WORKDIR /build/sglang/python
+
+# Install SGLang with sgl_kernel built from source
+RUN pip install -e . --verbose 2>&1 | tee /build/install.log || \
+    (echo "Installation failed, trying alternative method..." && \
+     pip install --no-deps -e . --verbose && \
+     pip install sgl-kernel --no-cache-dir --verbose) || \
+    echo "Warning: sgl_kernel installation may need manual intervention"
+
+# Install additional dependencies that depend on successful sgl_kernel build
+RUN pip install --no-cache-dir \
+    sentencepiece \
+    protobuf \
+    autoawq
+
+# Install FlashInfer for CUDA 12.8 if available
+RUN pip install flashinfer -i https://flashinfer.ai/whl/cu128/torch2.7/ || \
+    echo "FlashInfer not available for CUDA 12.8, proceeding without it"
+
+# Install Triton
+RUN pip install triton
+
+# RTX 5090 optimized environment variables
+ENV CUDA_VISIBLE_DEVICES=0
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+ENV CUDA_LAUNCH_BLOCKING=0
+
+# Verify PyTorch installation only (sgl_kernel verification happens at runtime)
+RUN python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA available in build: {torch.cuda.is_available()}')" && \
+    python -c "import sglang; print('SGLang package imported successfully')"
+
+# Set working directory
+WORKDIR /app
+
+# Expose ports
+EXPOSE 8000 8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Default command
+ENTRYPOINT ["python", "-m", "sglang.launch_server"]

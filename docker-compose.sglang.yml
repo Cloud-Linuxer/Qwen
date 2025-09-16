@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # Qwen3-4B with SGLang - RTX 5090 Compatible
+  sglang:
+    image: lmsysorg/sglang:latest
+    container_name: qwen3-4b-sglang
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "0.0.0.0:8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      - ./models:/models
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+      - HF_TOKEN=${HF_TOKEN:-}
+      # RTX 5090 compatibility
+      - TORCH_CUDA_ARCH_LIST=8.0;8.6;8.9;9.0
+      - CUDA_LAUNCH_BLOCKING=1
+    command: >
+      python -m sglang.launch_server
+      --model-path Qwen/Qwen3-4B-Instruct-2507
+      --host 0.0.0.0
+      --port 8000
+      --dtype float16
+      --max-total-tokens 8192
+      --mem-fraction-static 0.85
+      --trust-remote-code
+      --disable-flashinfer
+      --disable-cuda-graph
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    restart: unless-stopped
+    shm_size: '16gb'
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+
+networks:
+  default:
+    name: sglang-network
+    driver: bridge

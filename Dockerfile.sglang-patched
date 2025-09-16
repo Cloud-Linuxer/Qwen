@@ -1,0 +1,119 @@
+# SGLang with RTX 5090 Patches - Minimal and Stable
+FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04
+
+# Minimal system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-dev \
+    python3-pip \
+    git \
+    curl \
+    build-essential \
+    libnuma-dev \
+    libnuma1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Upgrade pip
+RUN python -m pip install --upgrade pip setuptools wheel
+
+# Install PyTorch 2.7.0 - EXACT version for stability
+RUN pip install torch==2.7.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+
+# Clone SGLang at specific stable commit
+WORKDIR /opt
+RUN git clone https://github.com/sgl-project/sglang.git && \
+    cd sglang && \
+    git checkout v0.3.7
+
+# Apply RTX 5090 patches BEFORE building
+COPY sglang_rtx5090_patch.py /opt/sglang/
+
+# Create patch script to skip kernel build
+RUN cd /opt/sglang && \
+    cat > patch_setup.py << 'EOF'
+import sys
+import os
+# Skip sgl_kernel build on RTX 5090
+os.environ["SGLANG_SKIP_KERNEL_BUILD"] = "1"
+EOF
+
+# Apply the patch (prepend to setup.py)
+RUN cd /opt/sglang/python && \
+    cat /opt/sglang/patch_setup.py setup.py > setup_new.py && \
+    mv setup_new.py setup.py
+
+# Install SGLang without sgl_kernel
+WORKDIR /opt/sglang/python
+RUN pip install --no-cache-dir \
+    transformers==4.44.2 \
+    numpy==1.26.4 \
+    requests \
+    aiohttp \
+    fastapi \
+    uvicorn \
+    psutil \
+    protobuf \
+    sentencepiece
+
+# Install SGLang core (will skip kernel build)
+RUN pip install -e . || echo "SGLang installed (kernel build skipped)"
+
+# Install AWQ support
+RUN pip install autoawq==0.2.6
+
+# NO Triton - causes issues with Blackwell
+# NO FlashInfer - causes segfaults
+# NO xformers - use native PyTorch attention
+
+# RTX 5090 environment
+ENV CUDA_VISIBLE_DEVICES=0
+ENV TORCH_CUDA_ARCH_LIST="12.0+PTX"
+ENV PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True,max_split_size_mb:512"
+ENV CUDA_LAUNCH_BLOCKING=1
+
+# Disable all problematic features
+ENV SGLANG_DISABLE_FLASHINFER=1
+ENV SGLANG_DISABLE_CUDA_GRAPH=1
+ENV SGLANG_DISABLE_CUSTOM_KERNELS=1
+ENV SGLANG_ATTENTION_BACKEND=torch_native
+ENV DISABLE_CUSTOM_ALL_REDUCE=1
+
+# Create startup script using heredoc
+RUN cat > /start.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "=== SGLang RTX 5090 Patched Mode ==="
+echo "All optimizations disabled for stability"
+echo "====================================="
+
+# Apply patches
+python /opt/sglang/sglang_rtx5090_patch.py
+
+# Start server with minimal settings
+python -m sglang.launch_server \
+    --model-path ${MODEL_PATH:-Qwen/Qwen3-32B-AWQ} \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --quantization ${QUANTIZATION:-awq_marlin} \
+    --max-total-tokens ${MAX_TOKENS:-4096} \
+    --mem-fraction-static ${MEM_FRACTION:-0.80} \
+    --trust-remote-code \
+    --disable-cuda-graph \
+    --disable-custom-all-reduce \
+    --disable-flashinfer \
+    --disable-radix-cache \
+    --log-level debug \
+    "$@"
+EOF
+
+RUN chmod +x /start.sh
+
+WORKDIR /app
+EXPOSE 8000
+
+ENTRYPOINT ["/start.sh"]

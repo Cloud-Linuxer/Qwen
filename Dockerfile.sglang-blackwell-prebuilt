@@ -1,0 +1,88 @@
+# SGLang for RTX 5090 with Pre-built Blackwell sgl_kernel
+FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3-pip \
+    git \
+    wget \
+    curl \
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    libnuma-dev \
+    libnuma1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Upgrade pip and install build tools
+RUN python -m pip install --upgrade pip setuptools wheel ninja
+
+# Install PyTorch nightly with CUDA 12.8
+RUN pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+
+# Install pre-built sgl_kernel for Blackwell
+RUN pip3 install https://github.com/sgl-project/whl/releases/download/v0.3.7/sgl_kernel_cu128_blackwell-0.3.7-py3-none-manylinux2014_x86_64.whl
+
+# Install SGLang and dependencies
+RUN pip install sglang[all] --no-deps && \
+    pip install \
+    transformers \
+    accelerate \
+    requests \
+    pillow \
+    aiohttp \
+    openai \
+    anthropic \
+    fastapi \
+    uvicorn \
+    psutil \
+    numpy \
+    packaging \
+    sentencepiece \
+    protobuf \
+    autoawq \
+    triton
+
+# Install FlashInfer for CUDA 12.8
+RUN pip install flashinfer -i https://flashinfer.ai/whl/cu128/torch2.7/ || \
+    echo "FlashInfer not available, proceeding without it"
+
+# Set CUDA architecture flags for RTX 5090 (Blackwell sm_120)
+ENV TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;12.0+PTX"
+ENV CUDA_ARCHITECTURES="80;86;89;90;120"
+
+# Ensure CUDA toolkit paths are available
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH="${CUDA_HOME}/bin:${PATH}"
+ENV LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}"
+
+# RTX 5090 optimized environment variables
+ENV CUDA_VISIBLE_DEVICES=0
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+ENV CUDA_LAUNCH_BLOCKING=0
+
+# Verify installation
+RUN python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" && \
+    python -c "import sgl_kernel; print('sgl_kernel imported successfully')" && \
+    python -c "import sglang; print('SGLang imported successfully')"
+
+# Set working directory
+WORKDIR /app
+
+# Expose ports
+EXPOSE 8000 8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Default command
+ENTRYPOINT ["python", "-m", "sglang.launch_server"]

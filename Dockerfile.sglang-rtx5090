@@ -1,0 +1,58 @@
+# SGLang RTX 5090 호환 이미지
+FROM nvidia/cuda:12.6.2-devel-ubuntu22.04
+
+# Python 3.11 설치
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-dev \
+    python3-pip \
+    git \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 3.11을 기본으로 설정
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# pip 업그레이드
+RUN python -m pip install --upgrade pip
+
+# PyTorch 2.5.1 with CUDA 12.4 설치 (RTX 5090 호환)
+RUN pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# SGLang 및 의존성 설치
+RUN pip install --no-cache-dir \
+    sglang[all] \
+    transformers \
+    accelerate \
+    sentencepiece \
+    protobuf \
+    auto-awq \
+    autoawq \
+    nvidia-ml-py
+
+# FlashInfer 설치 (CUDA 12.4 호환)
+RUN pip install flashinfer -i https://flashinfer.ai/whl/cu124/torch2.5/
+
+# Triton 설치
+RUN pip install triton
+
+# RTX 5090 환경 변수
+ENV CUDA_VISIBLE_DEVICES=0
+ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0;12.0+PTX"
+ENV CUDA_LAUNCH_BLOCKING=0
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+# 작업 디렉토리
+WORKDIR /app
+
+# 포트 노출
+EXPOSE 8000 8001
+
+# 헬스체크
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# 기본 명령
+ENTRYPOINT ["python", "-m", "sglang.launch_server"]
