@@ -1,0 +1,2 @@
+Configuration,Port,Short_Avg_Latency_ms,Short_Min_Latency_ms,Short_P95_Latency_ms,Medium_Avg_Throughput_tps,Medium_Min_Throughput_tps,Medium_Max_Throughput_tps,TTFT_Avg_ms,TTFT_Min_ms,TTFT_P95_ms,Korean_Avg_Throughput_tps,Test_Runs_Short,Test_Runs_Medium,Test_Runs_TTFT,Test_Runs_Korean
+Baseline-Triton,8000,1054.1,980.7,1058.7,10.16,10.16,10.16,269.0,189.4,295.1,10.03,20,10,10,5

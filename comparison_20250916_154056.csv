@@ -1,0 +1,3 @@
+Configuration,Avg_Latency_ms,Min_Latency_ms,Max_Latency_ms,Avg_Throughput_tps,Avg_TTFT_ms,Samples
+Baseline-Triton,1054.1,980.7,1059.0,10.16,269.0,20
+Balanced-v2-LOF,975.7,970.7,977.1,10.27,231.5,10
